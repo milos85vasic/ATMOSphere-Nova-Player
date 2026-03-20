@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
-  <remote name="github" fetch="." />
+  <remote name="atmosphere" fetch="ssh://git@github.com/ATMOSphere1234321/" />
 
-  <default revision="master" remote="github" />
+  <default revision="master" remote="atmosphere" />
 
   <project path="AVP" name="aos-AVP" revision="nova" >
     <copyfile src="Makefile" dest="Makefile" />
