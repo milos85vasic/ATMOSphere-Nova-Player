@@ -11,10 +11,15 @@
 #     shipped with package=org.courville.nova; the rebuilt APK has
 #     package=atmosphere.nova.player + label="ATMOSphere Nova Player".)
 #
-# Native libraries: pre-built libavcodec/libavformat/libavfilter/libavos/...
-# are committed in MediaLib/libs/<abi>/ (ABIs: arm64-v8a, armeabi-v7a,
-# x86, x86_64). We pass -x :MediaLib:ndkBuild to skip the make-driven
-# native rebuild — gradle just packages the existing .so files.
+# Native libraries: the native rebuild (:MediaLib:ndkBuild) IS run so the
+# FIND-12 stream_video.c NULL-guard is compiled into libavos.so (§11.4.108
+# SOURCE→ARTIFACT — the prior committed .so predated that fix). The upstream
+# Nova ".player" Android.mk templates are activated (copied to Android.mk)
+# just before gradle so ndk-build can discover the four native projects
+# (libyuv, libnativehelper, avos, torrentd). FFmpeg/dav1d/opus/openssl/
+# libmysofa self-skip on their committed prebuilts; only dav1d (no prebuilt)
+# + avos/libyuv/libnativehelper/torrentd actually compile.
+# See docs/research/1_2_0_dev_d3_findings/FIX_nova_ndkbuild_blocker.md.
 #
 # Signing: AOSP re-signs at image-assembly time via LOCAL_CERTIFICATE :=
 # platform in prebuilt_apps/Android.mk. We debug-sign the gradle output
@@ -81,15 +86,41 @@ fi
 _SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
 echo "[ATMOSphere-Nova] ANDROID_SDK_ROOT=$_SDK"
 
+# --- Activate the upstream-Nova ".player" Android.mk templates ----------------
+# ndk-build (invoked as `ndk-build -C native/<dir>` by core.mk:204 via the
+# :MediaLib:ndkBuild make targets) auto-discovers a project by finding
+# jni/Android.mk (or Android.mk in cwd). This checkout ships ONLY the upstream
+# Nova ".player" template form (Android.mk.player) with NO active Android.mk,
+# so ndk-build fails with "Please define the NDK_PROJECT_PATH variable"
+# (build-local.mk:151) — the 1.2.0-dev-0.0.2 blocker. Copy each .player
+# template to its active Android.mk name so the four native ndk-build dirs
+# (libyuv, libnativehelper, avos, torrentd) become discoverable. Idempotent;
+# templates remain the source of truth (we copy, never edit them).
+# (cwd here is $SCRIPT_DIR — `cd "$SCRIPT_DIR"` ran above.)
+echo "[ATMOSphere-Nova] activating .player Android.mk templates for ndk-build"
+_activate_player() {  # $1 = path to an *.player file
+    [ -f "$1" ] || return 0
+    _dst="${1%.player}"
+    cp -f "$1" "$_dst"
+}
+for _p in \
+    native/libyuv/Android.mk.player          native/libyuv/jni/Android.mk.player \
+    native/libnativehelper/Android.mk.player native/libnativehelper/jni/Android.mk.player \
+    native/avos/jni/Android.mk.player \
+    native/torrentd/Android.mk.player        native/torrentd/jni/Android.mk.player; do
+    _activate_player "$_p"
+done
+# -----------------------------------------------------------------------------
+
 # Run gradle from inside Video/ — that's where the gradlew wrapper lives.
 # -Puniversal: produce a single multi-ABI APK (not per-ABI splits).
-# -x :MediaLib:ndkBuild: skip the make-driven native rebuild; pre-committed
-#                       .so files in MediaLib/libs/<abi>/ are sufficient.
-echo "[ATMOSphere-Nova] running: cd Video && ./gradlew :assembleNoamazonRelease -Puniversal -x :MediaLib:ndkBuild"
+# :MediaLib:ndkBuild is NOT skipped — the native rebuild produces a fresh
+# libavos.so carrying the FIND-12 NULL-guard (§11.4.108 SOURCE→ARTIFACT).
+echo "[ATMOSphere-Nova] running: cd Video && ./gradlew :assembleNoamazonRelease -Puniversal"
 cd Video
 chmod +x ./gradlew 2>/dev/null || true
 ANDROID_SDK_ROOT="$_SDK" \
-    ./gradlew --no-daemon --console=plain :assembleNoamazonRelease -Puniversal -x :MediaLib:ndkBuild
+    ./gradlew --no-daemon --console=plain :assembleNoamazonRelease -Puniversal
 
 # Locate the resulting universal APK.
 APK_PATH=""
