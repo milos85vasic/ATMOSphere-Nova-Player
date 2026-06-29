@@ -44,13 +44,30 @@ echo "[ATMOSphere-Nova] build-atmosphere-nova-player.sh"
 echo "  script dir: $SCRIPT_DIR"
 echo "  parent:     $PARENT_ROOT"
 
-# Sanity check: native libs must be present in MediaLib/libs/<abi>/
+# Native libs must be present in MediaLib/libs/<abi>/ (jniLibs.srcDirs=['libs']
+# in MediaLib/build.gradle). The committed FFmpeg prebuilts live under
+# native/prebuilt/ffmpeg/dist-full-<abi>/lib/ — stage them into MediaLib/libs/
+# (ATM-535). This is a deterministic copy of already-committed prebuilts, not a
+# regeneration, so it is reproducible and safe on every fresh checkout.
+_FFMPEG_DIST=native/prebuilt/ffmpeg
+# ABI map: MediaLib/libs/<jni-abi>  <-  dist-full-<dist-abi>/lib
+_stage_abi() {
+    _jni="MediaLib/libs/$1"; _dist="$_FFMPEG_DIST/dist-full-$1/lib"
+    [ -f "$_jni/libavcodec.so" ] && return 0   # already staged
+    if [ -d "$_dist" ]; then
+        mkdir -p "$_jni"
+        cp -f "$_dist"/*.so "$_jni/" 2>/dev/null && \
+            echo "[ATMOSphere-Nova] staged $(ls "$_dist"/*.so 2>/dev/null | wc -l) FFmpeg .so → $_jni (ATM-535)"
+    fi
+}
+for _abi in arm64-v8a armeabi-v7a x86 x86_64; do _stage_abi "$_abi"; done
+
 _JNI_ARM64=MediaLib/libs/arm64-v8a
 if [ ! -f "$_JNI_ARM64/libavcodec.so" ]; then
-    echo "[ATMOSphere-Nova] ERROR: $_JNI_ARM64/libavcodec.so missing."
-    echo "  Run 'make' inside this submodule first to populate MediaLib/libs/"
-    echo "  from the FFmpeg + libavos sources. That is a one-time, expensive"
-    echo "  operation; once the .so files exist they are committed."
+    echo "[ATMOSphere-Nova] ERROR: $_JNI_ARM64/libavcodec.so missing after staging."
+    echo "  Expected committed prebuilts at $_FFMPEG_DIST/dist-full-arm64-v8a/lib/*.so."
+    echo "  If those are absent, run 'make' inside this submodule first to build the"
+    echo "  FFmpeg + libavos sources (one-time, expensive; outputs are committed)."
     exit 2
 fi
 

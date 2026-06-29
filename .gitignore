@@ -1,3 +1,7 @@
 android-sdk
 android-ndk
 release/config.ini
+
+# ATM-535: FFmpeg .so staged at build time from native/prebuilt/ffmpeg/dist-full-<abi>/
+# by build-atmosphere-nova-player.sh (regenerable per §11.4.77 — not versioned).
+MediaLib/libs/
