@@ -124,7 +124,8 @@ for _p in \
     native/libyuv/Android.mk.player          native/libyuv/jni/Android.mk.player \
     native/libnativehelper/Android.mk.player native/libnativehelper/jni/Android.mk.player \
     native/avos/jni/Android.mk.player \
-    native/torrentd/Android.mk.player        native/torrentd/jni/Android.mk.player; do
+    native/torrentd/Android.mk.player        native/torrentd/jni/Android.mk.player \
+    FileCoreLibrary/jni/Android.mk.player     FileCoreLibrary/jni/utils/Android.mk.player; do
     _activate_player "$_p"
 done
 # -----------------------------------------------------------------------------
